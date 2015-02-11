@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 )
 
 func readPointsZ(buffer *bytes.Buffer, points []Point) (err error) {
@@ -62,10 +63,8 @@ func readFigures(buffer *bytes.Buffer, count uint32, properties SerializationPro
 		return figures, nil
 	}
 
-	if properties.P {
-		figures = append(figures, Figure{Attribute: 0x01, Offset: 0})
-	} else if properties.L {
-		figures = append(figures, Figure{Attribute: 0x01, Offset: 0})
+	if properties.P || properties.L {
+		figures = append(figures, Figure{Attribute: FIGURE_STROKE, Offset: 0})
 	} else {
 		for i := 0; i < int(count); i++ {
 
@@ -90,12 +89,12 @@ func readShapes(buffer *bytes.Buffer, count uint32, properties SerializationProp
 		shapes = append(shapes, Shape{
 			ParentOffset: -1,
 			FigureOffset: 0,
-			OpenGisType:  0x01})
+			OpenGisType:  SHAPE_POINT})
 	} else if properties.L {
 		shapes = append(shapes, Shape{
 			ParentOffset: -1,
 			FigureOffset: 0,
-			OpenGisType:  0x01})
+			OpenGisType:  SHAPE_LINESTRING})
 	} else {
 		for i := 0; i < int(count); i++ {
 			var s Shape
@@ -130,15 +129,16 @@ func readSegments(buffer *bytes.Buffer, count uint32) (segments []Segment, err e
 	return segments, nil
 }
 
-func ReadGeography(data []byte) (g Geometry, err error) {
+func ReadGeography(data []byte) (g *Geometry, err error) {
 	return parseGeometry(data, true)
 }
 
-func ReadGeometry(data []byte) (g Geometry, err error) {
+func ReadGeometry(data []byte) (g *Geometry, err error) {
 	return parseGeometry(data, false)
 }
 
-func parseGeometry(data []byte, isGeography bool) (g Geometry, err error) {
+func parseGeometry(data []byte, isGeography bool) (g *Geometry, err error) {
+	g = &Geometry{}
 
 	var numberOfPoints uint32
 	var numberOfFigures uint32
@@ -149,31 +149,31 @@ func parseGeometry(data []byte, isGeography bool) (g Geometry, err error) {
 
 	err = binary.Read(buffer, binary.LittleEndian, &g.SRID)
 	if err != nil {
-		return g, err
+		return nil, err
 	}
 
 	if isGeography == true {
 		if g.SRID == -1 {
 			return
 		} else if g.SRID < 4210 || g.SRID > 4999 {
-			return g, fmt.Errorf("Invalid SRID for geography")
+			return nil, fmt.Errorf("Invalid SRID for geography")
 		}
 	}
 
 	//version
 	err = binary.Read(buffer, binary.LittleEndian, &g.Version)
 	if err != nil {
-		return g, err
+		return nil, err
 	}
 	if g.Version > 2 {
-		return g, fmt.Errorf("Version %d is not supported", g.Version)
+		return nil, fmt.Errorf("Version %d is not supported", g.Version)
 	}
 
 	//flags
 	var flags uint8 = 0
 	err = binary.Read(buffer, binary.LittleEndian, &flags)
 	if err != nil {
-		return g, err
+		return nil, err
 	}
 	g.Properties.Z = (flags & (1 << 0)) != 0
 	g.Properties.M = (flags & (1 << 1)) != 0
@@ -185,7 +185,7 @@ func parseGeometry(data []byte, isGeography bool) (g Geometry, err error) {
 		g.Properties.H = (flags & (1 << 5)) != 0
 	}
 	if g.Properties.P && g.Properties.L {
-		return g, fmt.Errorf("geometry data is invalid")
+		return nil, fmt.Errorf("geometry data is invalid")
 	}
 
 	//points
@@ -196,24 +196,24 @@ func parseGeometry(data []byte, isGeography bool) (g Geometry, err error) {
 	} else {
 		err = binary.Read(buffer, binary.LittleEndian, &numberOfPoints)
 		if err != nil {
-			return g, err
+			return nil, err
 		}
 	}
 	g.Points, err = readPoints(buffer, numberOfPoints)
 	if err != nil {
-		return g, err
+		return nil, err
 	}
 
 	if g.Properties.Z {
 		err = readPointsZ(buffer, g.Points)
 		if err != nil {
-			return g, err
+			return nil, err
 		}
 	}
 	if g.Properties.M {
 		err = readPointsM(buffer, g.Points)
 		if err != nil {
-			return g, err
+			return nil, err
 		}
 	}
 
@@ -223,12 +223,12 @@ func parseGeometry(data []byte, isGeography bool) (g Geometry, err error) {
 	} else {
 		err = binary.Read(buffer, binary.LittleEndian, &numberOfFigures)
 		if err != nil {
-			return g, err
+			return nil, err
 		}
 	}
 	g.Figures, err = readFigures(buffer, numberOfFigures, g.Properties)
 	if err != nil {
-		return g, err
+		return nil, err
 	}
 
 	//shapes
@@ -237,24 +237,25 @@ func parseGeometry(data []byte, isGeography bool) (g Geometry, err error) {
 	} else {
 		err = binary.Read(buffer, binary.LittleEndian, &numberOfShapes)
 		if err != nil {
-			return g, err
+			return nil, err
 		}
 	}
 	g.Shapes, err = readShapes(buffer, numberOfShapes, g.Properties)
 	if err != nil {
-		return g, err
+		return nil, err
 	}
 
 	//segments
 	if g.Version == 2 {
 		err = binary.Read(buffer, binary.LittleEndian, &numberOfSegments)
-		if err != nil {
-			return g, err
+		if err != nil && err != io.EOF {
+			return nil, err
 		}
 		g.Segments, err = readSegments(buffer, numberOfSegments)
 		if err != nil {
-			return g, err
+			return nil, err
 		}
+
 	}
 
 	return g, nil

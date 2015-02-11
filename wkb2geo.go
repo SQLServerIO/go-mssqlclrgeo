@@ -41,12 +41,10 @@ type linearRing struct {
 	numPoints uint32
 	points    []Point
 }
-
 type wkbPoint struct {
 	wkbGeometry WkbGeometry
 	point       Point
 }
-
 type wkbLineString struct {
 	wkbGeometry WkbGeometry
 	numPoints   uint32
@@ -77,16 +75,19 @@ type wkbGeometryCollection struct {
 	num_wkbGeometries uint32
 	wkbGeometries     []interface{}
 }
+type wkbCircularString struct {
+	wkbGeometry WkbGeometry
+	numPoints   uint32
+	points      []Point
+}
 
 type WkbGeometry struct {
 	byteOrder wkbByteOrder
 	wkbType   wkbGeometryType
 	srid      uint32
-	//geo       interface{}
-
-	hasZ    bool
-	hasM    bool
-	hasSRID bool
+	hasZ      bool
+	hasM      bool
+	hasSRID   bool
 }
 
 func ParseWkb(data []byte) (g interface{}, err error) {
@@ -98,52 +99,122 @@ func ParseWkb(data []byte) (g interface{}, err error) {
 
 }
 
-func WkbToUdtGeo(geom interface{}) (data []byte, err error) {
+func WkbToUdtGeo(data_wkb []byte) (data_udt []byte, err error) {
 
-	var b Builder
+	geom, err := ParseWkb(data_wkb)
+	if err != nil {
+		return nil, err
+	}
+
+	b := NewBuilder()
+
+	err = buildType(geom, b)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.Generate()
+}
+
+func buildType(geom interface{}, b *Builder) (err error) {
 
 	switch wkbGeom := geom.(type) {
 
 	case *wkbPoint:
 		b.Srid = wkbGeom.wkbGeometry.srid
 		b.AddShape(SHAPE_POINT)
-		b.AddFeature()
+		b.AddFeature(FIGURE_STROKE)
 		b.AddPoint(wkbGeom.point.X, wkbGeom.point.Y, wkbGeom.point.Z, wkbGeom.point.M)
-
-		fmt.Println("WkbPoint 1")
+		b.CloseShape()
 
 	case *wkbLineString:
-		fmt.Println("WkbLineString 2")
 		b.Srid = wkbGeom.wkbGeometry.srid
 		b.AddShape(SHAPE_LINESTRING)
-		b.AddFeature()
+		b.AddFeature(FIGURE_STROKE)
 		for _, point := range wkbGeom.points {
 			b.AddPoint(point.X, point.Y, point.Z, point.M)
 		}
+		b.CloseShape()
+
 	case *wkbPolygon:
 		b.Srid = wkbGeom.wkbGeometry.srid
 		b.AddShape(SHAPE_POLYGON)
-		for _, ring := range wkbGeom.rings {
-			b.AddFeature()
+		for idx, ring := range wkbGeom.rings {
+			if idx == 0 {
+				b.AddFeature(FIGURE_EXTERIOR_RING)
+			} else {
+				b.AddFeature(FIGURE_INTERIOR_RING)
+			}
 			for _, point := range ring.points {
 				b.AddPoint(point.X, point.Y, point.Z, point.M)
 			}
 		}
-		fmt.Println("WkbPolygon 3")
+		b.CloseShape()
+
 	case *wkbMultiPoint:
-		//fmt.Println("MultiPoint 4")
+		b.Srid = wkbGeom.wkbGeometry.srid
+		b.AddShape(SHAPE_MULTIPOINT)
+		for _, p := range wkbGeom.wkbPoints {
+			b.AddShape(SHAPE_POINT)
+			b.AddFeature(FIGURE_STROKE)
+			b.AddPoint(p.point.X, p.point.Y, p.point.Z, p.point.M)
+			b.CloseShape()
+		}
+		b.CloseShape()
 	case *wkbMultiLineString:
-		//fmt.Println("MultiLineString 5")
+		b.Srid = wkbGeom.wkbGeometry.srid
+		b.AddShape(SHAPE_MULTILINESTRING)
+		for _, linestring := range wkbGeom.wkbLineStrings {
+			b.AddShape(SHAPE_LINESTRING)
+			b.AddFeature(FIGURE_STROKE)
+			for _, point := range linestring.points {
+				b.AddPoint(point.X, point.Y, point.Z, point.M)
+			}
+			b.CloseShape()
+		}
+		b.CloseShape()
 	case *wkbMultiPolygon:
-		fmt.Println("MultiPolygon 6")
-		fmt.Printf("num_wkbPolygons: %d", wkbGeom.num_wkbPolygons)
+		b.Srid = wkbGeom.wkbGeometry.srid
+		b.AddShape(SHAPE_MULTIPOLYGON)
+		for _, polygon := range wkbGeom.wkbPolygons {
+			b.AddShape(SHAPE_POLYGON)
+
+			for idx, ring := range polygon.rings {
+				if idx == 0 {
+					b.AddFeature(FIGURE_EXTERIOR_RING)
+				} else {
+					b.AddFeature(FIGURE_INTERIOR_RING)
+				}
+
+				for _, point := range ring.points {
+					b.AddPoint(point.X, point.Y, point.Z, point.M)
+				}
+			}
+			b.CloseShape()
+		}
+		b.CloseShape()
 
 	case *wkbGeometryCollection:
-		//fmt.Print("GeometryCollection 7")
+		b.AddShape(SHAPE_GEOMETRY_COLLECTION)
+		for _, coll_geom := range wkbGeom.wkbGeometries {
+			buildType(coll_geom, b)
+		}
+		b.CloseShape()
+		b.Srid = wkbGeom.wkbGeometry.srid
+
+	case *wkbCircularString:
+		b.Srid = wkbGeom.wkbGeometry.srid
+		b.AddShape(SHAPE_CIRCULAR_STRING)
+
+		b.AddFeature(FIGURE_V2_ARC)
+		for _, point := range wkbGeom.points {
+			b.AddPoint(point.X, point.Y, point.Z, point.M)
+		}
+		b.CloseShape()
 	default:
-		fmt.Print("other")
+		fmt.Print("Type not implemented")
 
 	}
+	return nil
 
-	return b.Generate()
 }

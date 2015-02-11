@@ -61,12 +61,59 @@ func readLineString(buffer *bytes.Buffer, order binary.ByteOrder, g *WkbGeometry
 	}
 	return
 }
+func readCircularString(buffer *bytes.Buffer, order binary.ByteOrder, g *WkbGeometry) (p *wkbCircularString, err error) {
+	p = &wkbCircularString{wkbGeometry: *g}
+
+	err = binary.Read(buffer, order, &p.numPoints)
+	if err != nil {
+		return nil, err
+	}
+
+	p.points = make([]Point, p.numPoints)
+	for i := 0; i < int(p.numPoints); i++ {
+		point, err := readPoint(buffer, order, g)
+		if err != nil {
+			return nil, err
+		}
+
+		p.points[i] = point
+	}
+	return
+}
 func readMultiPoint(buffer *bytes.Buffer, order binary.ByteOrder, g *WkbGeometry) (p *wkbMultiPoint, err error) {
 	p = &wkbMultiPoint{wkbGeometry: *g}
+
+	err = binary.Read(buffer, order, &p.num_wkbPoints)
+	if err != nil {
+		return
+	}
+
+	p.wkbPoints = make([]wkbPoint, p.num_wkbPoints)
+	for i := 0; i < int(p.num_wkbPoints); i++ {
+		point, err := readWKBGeometry(buffer)
+		if err != nil {
+			return nil, err
+		}
+		p.wkbPoints[i] = *(point.(*wkbPoint))
+	}
 	return
 }
 func readMultiLineString(buffer *bytes.Buffer, order binary.ByteOrder, g *WkbGeometry) (p *wkbMultiLineString, err error) {
 	p = &wkbMultiLineString{wkbGeometry: *g}
+
+	err = binary.Read(buffer, order, &p.num_wkbLineStrings)
+	if err != nil {
+		return
+	}
+
+	p.wkbLineStrings = make([]wkbLineString, p.num_wkbLineStrings)
+	for i := 0; i < int(p.num_wkbLineStrings); i++ {
+		linestring, err := readWKBGeometry(buffer)
+		if err != nil {
+			return nil, err
+		}
+		p.wkbLineStrings[i] = *(linestring.(*wkbLineString))
+	}
 	return
 }
 
@@ -91,7 +138,22 @@ func readMultiPolygon(buffer *bytes.Buffer, order binary.ByteOrder, g *WkbGeomet
 
 func readGeometryCollection(buffer *bytes.Buffer, order binary.ByteOrder, g *WkbGeometry) (p *wkbGeometryCollection, err error) {
 	p = &wkbGeometryCollection{wkbGeometry: *g}
+
+	err = binary.Read(buffer, order, &p.num_wkbGeometries)
+	if err != nil {
+		return
+	}
+
+	p.wkbGeometries = make([]interface{}, p.num_wkbGeometries)
+	for i := 0; i < int(p.num_wkbGeometries); i++ {
+		geom, err := readWKBGeometry(buffer)
+		if err != nil {
+			return nil, err
+		}
+		p.wkbGeometries[i] = (geom)
+	}
 	return
+
 }
 
 func readPolygon(buffer *bytes.Buffer, order binary.ByteOrder, g *WkbGeometry) (p *wkbPolygon, err error) {
@@ -189,6 +251,8 @@ func readWKBGeometry(buffer *bytes.Buffer) (geom interface{}, err error) {
 		geom, _ = readMultiPolygon(buffer, order, &g)
 	case typeWkbGeometryCollection:
 		geom, _ = readGeometryCollection(buffer, order, &g)
+	case typeWkbCircularString:
+		geom, _ = readCircularString(buffer, order, &g)
 	}
 
 	return

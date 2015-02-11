@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestGeographt(t *testing.T) {
+func TestGeography(t *testing.T) {
 	values := []struct {
 		hex       string
 		nbPoints  int
@@ -52,6 +52,8 @@ func TestGeographt(t *testing.T) {
 		if g.SRID != v.srid {
 			t.Errorf("(type#%d) Srid doesn't match, Value: %d Expected: %d", v.typeShape, g.SRID, v.srid)
 		}
+		//TODO test each points
+
 	}
 }
 func TestInvalidData(t *testing.T) {

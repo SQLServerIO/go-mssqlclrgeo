@@ -203,13 +203,15 @@ func WriteGeometry(g Geometry, isGeography bool) (data []byte, err error) {
 	//segments
 	if g.Version == 2 {
 		numberOfSegments = uint32(len(g.Segments))
-		err = binary.Write(buffer, binary.LittleEndian, &numberOfSegments)
-		if err != nil {
-			return nil, err
-		}
-		err = writeSegments(buffer, g.Segments)
-		if err != nil {
-			return nil, err
+		if numberOfSegments > 0 {
+			err = binary.Write(buffer, binary.LittleEndian, &numberOfSegments)
+			if err != nil {
+				return nil, err
+			}
+			err = writeSegments(buffer, g.Segments)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
