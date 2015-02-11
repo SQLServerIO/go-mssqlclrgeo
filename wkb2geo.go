@@ -161,6 +161,7 @@ func buildType(geom interface{}, b *Builder) (err error) {
 			b.CloseShape()
 		}
 		b.CloseShape()
+
 	case *wkbMultiLineString:
 		b.Srid = wkbGeom.wkbGeometry.srid
 		b.AddShape(SHAPE_MULTILINESTRING)
@@ -173,31 +174,23 @@ func buildType(geom interface{}, b *Builder) (err error) {
 			b.CloseShape()
 		}
 		b.CloseShape()
+
 	case *wkbMultiPolygon:
-		b.Srid = wkbGeom.wkbGeometry.srid
+
 		b.AddShape(SHAPE_MULTIPOLYGON)
 		for _, polygon := range wkbGeom.wkbPolygons {
-			b.AddShape(SHAPE_POLYGON)
-
-			for idx, ring := range polygon.rings {
-				if idx == 0 {
-					b.AddFeature(FIGURE_EXTERIOR_RING)
-				} else {
-					b.AddFeature(FIGURE_INTERIOR_RING)
-				}
-
-				for _, point := range ring.points {
-					b.AddPoint(point.X, point.Y, point.Z, point.M)
-				}
-			}
-			b.CloseShape()
+			buildType(&polygon, b)
 		}
 		b.CloseShape()
+		b.Srid = wkbGeom.wkbGeometry.srid
 
 	case *wkbGeometryCollection:
 		b.AddShape(SHAPE_GEOMETRY_COLLECTION)
 		for _, coll_geom := range wkbGeom.wkbGeometries {
-			buildType(coll_geom, b)
+			err := buildType(coll_geom, b)
+			if err != nil {
+				return err
+			}
 		}
 		b.CloseShape()
 		b.Srid = wkbGeom.wkbGeometry.srid
@@ -211,8 +204,9 @@ func buildType(geom interface{}, b *Builder) (err error) {
 			b.AddPoint(point.X, point.Y, point.Z, point.M)
 		}
 		b.CloseShape()
+
 	default:
-		fmt.Print("Type not implemented")
+		return fmt.Errorf("Type not implemented")
 
 	}
 	return nil

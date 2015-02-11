@@ -1,14 +1,11 @@
 package mssqlclrgeo
 
-//https://msdn.microsoft.com/en-us/library/ee320529(v=sql.105).aspx
-//https://msdn.microsoft.com/en-us/library/microsoft.sqlserver.types.sqlgeometrybuilder.begingeometry.aspx
 type Builder struct {
 	g          Geometry
 	Srid       uint32
 	stackShape stack
 }
 
-//type stack []*interface{}
 type stack []*Shape
 
 func NewBuilder() *Builder {

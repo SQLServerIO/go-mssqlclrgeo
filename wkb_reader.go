@@ -202,8 +202,6 @@ func readHeader(buffer *bytes.Buffer) (g WkbGeometry, order binary.ByteOrder, er
 		return g, nil, fmt.Errorf("Invalid byte order value")
 	}
 
-	fmt.Printf("ByteOrder: %d\n", g.byteOrder)
-
 	//Geometry type
 	err = binary.Read(buffer, order, &g.wkbType)
 	if err != nil {
@@ -222,11 +220,11 @@ func readHeader(buffer *bytes.Buffer) (g WkbGeometry, order binary.ByteOrder, er
 		}
 	}
 
-	fmt.Printf("geometryType: %d\n", g.wkbType)
+	/*fmt.Printf("geometryType: %d\n", g.wkbType)
 	fmt.Printf("hasSRID: %t\n", g.hasSRID)
 	fmt.Printf("hasZ: %t\n", g.hasZ)
 	fmt.Printf("hasM: %t\n", g.hasM)
-	fmt.Printf("SRID: : %d\n", g.srid)
+	fmt.Printf("SRID: : %d\n", g.srid)*/
 	return
 }
 
