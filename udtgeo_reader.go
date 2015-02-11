@@ -38,6 +38,7 @@ func readPoints(buffer *bytes.Buffer, count uint32) (points []Point, err error) 
 	if count < 1 {
 		return points, nil
 	}
+
 	for i := 0; i < int(count); i++ {
 
 		var point Point
@@ -164,6 +165,9 @@ func parseGeometry(data []byte, isGeography bool) (g Geometry, err error) {
 	if err != nil {
 		return g, err
 	}
+	if g.Version > 2 {
+		return g, fmt.Errorf("Version %d is not supported", g.Version)
+	}
 
 	//flags
 	var flags uint8 = 0
@@ -179,6 +183,9 @@ func parseGeometry(data []byte, isGeography bool) (g Geometry, err error) {
 
 	if g.Version == 2 {
 		g.Properties.H = (flags & (1 << 5)) != 0
+	}
+	if g.Properties.P && g.Properties.L {
+		return g, fmt.Errorf("geometry data is invalid")
 	}
 
 	//points
