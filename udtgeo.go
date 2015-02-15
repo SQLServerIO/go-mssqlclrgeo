@@ -81,7 +81,7 @@ type Geometry struct {
 	Segments []Segment
 }
 
-func (s *Shape) getFigures(g Geometry) (figures []Figure) {
+func (s *Shape) GetFigures(g Geometry) (figures []Figure) {
 	offset := s.FigureOffset
 
 	if len(g.Shapes) > s.index+1 {
@@ -93,6 +93,16 @@ func (s *Shape) getFigures(g Geometry) (figures []Figure) {
 	}
 	return
 }
+
+func (g *Geometry) GetShapes() (shapes []Shape) {
+	return g.Shapes
+}
+
+func (g *Figure) getPoints() (points []Point) {
+
+	return
+}
+
 func (s *Shape) getParent(g Geometry) (parent *Shape) {
 	offset := s.ParentOffset
 
