@@ -99,7 +99,7 @@ func ParseWkb(data []byte) (g interface{}, err error) {
 
 }
 
-func WkbToUdtGeo(data_wkb []byte) (data_udt []byte, err error) {
+func WkbToUdtGeo(data_wkb []byte, isGeography bool) (data_udt []byte, err error) {
 
 	geom, err := ParseWkb(data_wkb)
 	if err != nil {
@@ -113,7 +113,7 @@ func WkbToUdtGeo(data_wkb []byte) (data_udt []byte, err error) {
 		return nil, err
 	}
 
-	return b.Generate()
+	return b.Generate(isGeography)
 }
 
 func buildType(geom interface{}, b *Builder) (err error) {

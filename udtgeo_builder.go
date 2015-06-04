@@ -48,9 +48,9 @@ func (b *Builder) AddPoint(x float64, y float64, z float64, m float64) {
 	b.g.Points = append(b.g.Points, *point)
 }
 
-func (b *Builder) Generate() (data []byte, err error) {
+func (b *Builder) Generate(isGeography bool) (data []byte, err error) {
 	b.g.SRID = int32(b.Srid)
-	return WriteGeometry(b.g, false)
+	return WriteGeometry(b.g, isGeography)
 }
 
 func (s stack) Empty() bool    { return len(s) == 0 }
